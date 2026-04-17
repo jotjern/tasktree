@@ -101,6 +101,8 @@ export default function App() {
           onRename={workspaces.rename}
           onRemove={workspaces.remove}
         />
+      </div>
+      <div className="top-right-stack">
         {helpHidden ? (
           <button
             className="help-button"
