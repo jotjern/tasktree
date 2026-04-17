@@ -2,6 +2,7 @@ import { AppState, WorkspaceIndex, WorkspaceSnapshot, emptyState } from './types
 
 const INDEX_KEY = 'taskdag:workspaces';
 const LEGACY_KEY = 'taskdag:v1';
+const SYNC_UPDATED_AT_KEY = 'taskdag:sync_updated_at';
 
 const workspaceKey = (id: string) => `taskdag:ws:${id}`;
 
@@ -86,6 +87,17 @@ export function saveWorkspaceSnapshot(snapshot: WorkspaceSnapshot): void {
   for (const workspace of snapshot.index.workspaces) {
     saveWorkspaceState(workspace.id, snapshot.states[workspace.id] ?? emptyState());
   }
+}
+
+export function loadSyncUpdatedAt(): number {
+  const raw = localStorage.getItem(SYNC_UPDATED_AT_KEY);
+  if (!raw) return 0;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+export function saveSyncUpdatedAt(updatedAt: number): void {
+  localStorage.setItem(SYNC_UPDATED_AT_KEY, String(Math.max(0, Math.floor(updatedAt))));
 }
 
 export function deleteWorkspaceState(id: string): void {

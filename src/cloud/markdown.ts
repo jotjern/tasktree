@@ -14,8 +14,10 @@ export function encodeMarkdown(state: AppState): string {
   return lines.join('\n') + '\n';
 }
 
-export function encodeWorkspaceMarkdown(snapshot: WorkspaceSnapshot): string {
-  const lines: string[] = ['# TaskDAG', ''];
+export function encodeWorkspaceMarkdown(snapshot: WorkspaceSnapshot, updatedAt?: number): string {
+  const lines: string[] = ['# TaskDAG'];
+  if (updatedAt !== undefined) lines.push(`<!-- updated:${updatedAt} -->`);
+  lines.push('');
   for (const workspace of snapshot.index.workspaces) {
     lines.push(`## ${workspace.name} <!-- workspace:${workspace.id} -->`, '');
     lines.push(...encodeTaskLines(snapshot.states[workspace.id] ?? emptyState()));
@@ -50,6 +52,7 @@ interface ParsedLine {
 
 const LINE_RE = /^(\s*)-\s*\[([ xX])\]\s*(.*?)(?:\s*<!--\s*id:([^\s]+)(?:\s+ts:(\d+))?\s*-->)?\s*$/;
 const WORKSPACE_HEADING_RE = /^##\s*(.*?)(?:\s*<!--\s*workspace:([^\s]+)\s*-->)?\s*$/;
+const UPDATED_RE = /^<!--\s*updated:(\d+)\s*-->/m;
 
 export function decodeMarkdown(text: string): AppState {
   return decodeTaskLines(text.split(/\r?\n/));
@@ -92,6 +95,13 @@ export function decodeWorkspaceMarkdown(
     version: 2,
   };
   return { index, states };
+}
+
+export function getMarkdownUpdatedAt(text: string): number | null {
+  const m = UPDATED_RE.exec(text);
+  if (!m) return null;
+  const value = Number(m[1]);
+  return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 function decodeTaskLines(lines: string[]): AppState {

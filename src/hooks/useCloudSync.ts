@@ -4,8 +4,17 @@ import { UseTasks } from './useTasks';
 import { UseWorkspaces } from './useWorkspaces';
 import { clearToken, getToken, handleCallback, startLogin } from '../cloud/auth';
 import { clearGistId, findOrCreateGist, pullGist, pushGist } from '../cloud/gist';
-import { decodeWorkspaceMarkdown, encodeWorkspaceMarkdown } from '../cloud/markdown';
-import { loadWorkspaceSnapshot, saveWorkspaceSnapshot } from '../storage';
+import {
+  decodeWorkspaceMarkdown,
+  encodeWorkspaceMarkdown,
+  getMarkdownUpdatedAt,
+} from '../cloud/markdown';
+import {
+  loadSyncUpdatedAt,
+  loadWorkspaceSnapshot,
+  saveSyncUpdatedAt,
+  saveWorkspaceSnapshot,
+} from '../storage';
 
 export type SyncStatus = 'signed_out' | 'connecting' | 'idle' | 'syncing' | 'error';
 
@@ -34,6 +43,20 @@ function hasRemoteContent(markdown: string): boolean {
   return /^##\s+/m.test(markdown) || /^\s*-\s*\[[ xX]\]/m.test(markdown);
 }
 
+function snapshotContent(snapshot: WorkspaceSnapshot): string {
+  return encodeWorkspaceMarkdown(snapshot, 0);
+}
+
+function inferSnapshotUpdatedAt(snapshot: WorkspaceSnapshot): number {
+  let updatedAt = 0;
+  for (const state of Object.values(snapshot.states)) {
+    for (const task of Object.values(state.tasks)) {
+      if (task.createdAt > updatedAt) updatedAt = task.createdAt;
+    }
+  }
+  return updatedAt;
+}
+
 export function useCloudSync(tasks: UseTasks, workspaces: UseWorkspaces): UseCloudSync {
   const [status, setStatus] = useState<SyncStatus>(() => {
     if (getToken()) return 'connecting';
@@ -46,6 +69,21 @@ export function useCloudSync(tasks: UseTasks, workspaces: UseWorkspaces): UseClo
   const initializedRef = useRef(false);
   const snapshotRef = useRef(loadWorkspaceSnapshot(workspaces.index, tasks.state));
   snapshotRef.current = loadWorkspaceSnapshot(workspaces.index, tasks.state);
+  const localUpdatedAtRef = useRef(
+    loadSyncUpdatedAt() || inferSnapshotUpdatedAt(snapshotRef.current),
+  );
+  const snapshotContentRef = useRef(snapshotContent(snapshotRef.current));
+
+  useEffect(() => {
+    const nextSnapshot = loadWorkspaceSnapshot(workspaces.index, tasks.state);
+    const nextContent = snapshotContent(nextSnapshot);
+    if (nextContent === snapshotContentRef.current) return;
+
+    snapshotContentRef.current = nextContent;
+    const updatedAt = Date.now();
+    localUpdatedAtRef.current = updatedAt;
+    saveSyncUpdatedAt(updatedAt);
+  }, [tasks.state, workspaces.index]);
 
   useEffect(() => {
     if (initializedRef.current) return;
@@ -76,21 +114,41 @@ export function useCloudSync(tasks: UseTasks, workspaces: UseWorkspaces): UseClo
 
         const remote = await pullGist(token, gistId);
         console.log('[sync] pulled gist, length:', remote.length);
+        const localSnapshot = snapshotRef.current;
+        const localUpdatedAt =
+          localUpdatedAtRef.current || inferSnapshotUpdatedAt(localSnapshot);
 
-        if (hasRemoteContent(remote)) {
-          console.log('[sync] applying remote workspaces');
-          const parsed = decodeWorkspaceMarkdown(remote, workspaces.activeWorkspace);
-          saveWorkspaceSnapshot(parsed);
-          workspaces.replaceIndex(parsed.index);
-          tasks.replaceState(parsed.states[parsed.index.activeId] ?? emptyState());
-          lastPushedRef.current = remote;
-        } else if (hasSnapshotContent(snapshotRef.current)) {
-          console.log('[sync] pushing local workspaces to empty gist');
-          const md = encodeWorkspaceMarkdown(snapshotRef.current);
+        const pushLocal = async () => {
+          console.log('[sync] pushing local workspaces to gist');
+          const updatedAt = localUpdatedAt || Date.now();
+          localUpdatedAtRef.current = updatedAt;
+          saveSyncUpdatedAt(updatedAt);
+          const md = encodeWorkspaceMarkdown(localSnapshot, updatedAt);
           await pushGist(token, gistId, md);
           lastPushedRef.current = md;
+        };
+
+        if (hasRemoteContent(remote)) {
+          const parsed = decodeWorkspaceMarkdown(remote, workspaces.activeWorkspace);
+          const remoteUpdatedAt =
+            getMarkdownUpdatedAt(remote) ?? inferSnapshotUpdatedAt(parsed);
+
+          if (remoteUpdatedAt > localUpdatedAt) {
+            console.log('[sync] applying newer remote workspaces');
+            saveWorkspaceSnapshot(parsed);
+            saveSyncUpdatedAt(remoteUpdatedAt);
+            localUpdatedAtRef.current = remoteUpdatedAt;
+            snapshotContentRef.current = snapshotContent(parsed);
+            workspaces.replaceIndex(parsed.index);
+            tasks.replaceState(parsed.states[parsed.index.activeId] ?? emptyState());
+            lastPushedRef.current = remote;
+          } else {
+            await pushLocal();
+          }
+        } else if (hasSnapshotContent(snapshotRef.current)) {
+          await pushLocal();
         } else {
-          lastPushedRef.current = encodeWorkspaceMarkdown(snapshotRef.current);
+          lastPushedRef.current = encodeWorkspaceMarkdown(snapshotRef.current, localUpdatedAt);
         }
         setStatus('idle');
       } catch (e) {
@@ -107,7 +165,13 @@ export function useCloudSync(tasks: UseTasks, workspaces: UseWorkspaces): UseClo
     const gistId = gistIdRef.current;
     if (!token || !gistId) return;
 
-    const md = encodeWorkspaceMarkdown(loadWorkspaceSnapshot(workspaces.index, tasks.state));
+    const updatedAt = localUpdatedAtRef.current || Date.now();
+    localUpdatedAtRef.current = updatedAt;
+    saveSyncUpdatedAt(updatedAt);
+    const md = encodeWorkspaceMarkdown(
+      loadWorkspaceSnapshot(workspaces.index, tasks.state),
+      updatedAt,
+    );
     if (md === lastPushedRef.current) return;
 
     const handle = window.setTimeout(async () => {
