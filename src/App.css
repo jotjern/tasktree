@@ -457,6 +457,18 @@ body {
     0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
+.task-node--framed {
+  border-radius: 0 0 8px 8px;
+}
+
+.task-node--selected.task-node--framed {
+  box-shadow: none;
+}
+
+.task-node--framed.task-node--has-progress::before {
+  border-top-left-radius: 0;
+}
+
 .task-node--root {
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -559,6 +571,20 @@ body {
   flex: 1;
 }
 
+.task-selection-frame {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 0 5px #f59e0b,
+    0 0 14px 3px rgba(245, 158, 11, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.1);
+  z-index: 1;
+  pointer-events: none;
+}
+
 .task-action-bar {
   position: absolute;
   left: 0;
@@ -566,10 +592,7 @@ body {
   display: flex;
   align-items: stretch;
   border-radius: 8px 8px 0 0;
-  box-shadow:
-    0 0 0 2px #ffffff,
-    0 0 0 5px #f59e0b,
-    0 0 14px 3px rgba(245, 158, 11, 0.45);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.15);
   z-index: 2;
   overflow: hidden;
 }
@@ -597,7 +620,7 @@ body {
 }
 
 .task-action-btn + .task-action-btn {
-  border-left: 1px solid rgba(0, 0, 0, 0.12);
+  border-left: 2px solid rgba(0, 0, 0, 0.15);
 }
 
 .task-action-plus {
@@ -608,17 +631,14 @@ body {
   border-radius: 50%;
   cursor: pointer;
   font: inherit;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow:
-    0 0 0 2px #ffffff,
-    0 0 0 5px #f59e0b,
-    0 0 14px 3px rgba(245, 158, 11, 0.45);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.12);
   z-index: 2;
 }
 

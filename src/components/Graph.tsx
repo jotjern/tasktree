@@ -8,7 +8,7 @@ import {
 import { colorForRoot, tintForDepth } from '../model/colors';
 import { depthFromRoot, findRootOf } from '../model/tree';
 import { TaskNode } from './TaskNode';
-import { TaskActionBar } from './TaskActionBar';
+import { TaskActionBar, ACTION_BAR_HEIGHT } from './TaskActionBar';
 import { UseTasks } from '../hooks/useTasks';
 import { useIsTouch } from '../hooks/useIsTouch';
 
@@ -111,50 +111,71 @@ export function Graph({ state, layout, tasks, scrollRef }: Props) {
           />
         ))}
       </svg>
-      {Object.keys(state.tasks).map((id) => {
-        const task = state.tasks[id];
-        const pos = layout.positions[id];
-        if (!pos) return null;
-        const stats = progress[id] ?? { done: 0, total: 0 };
-        return (
-          <TaskNode
-            key={id}
-            task={task}
-            x={pos.x}
-            y={pos.y}
-            color={nodeColors[id]}
-            selected={state.selectedId === id}
-            editing={tasks.editingId === id}
-            isRoot={task.parentId === null}
-            descendantsDone={stats.done}
-            descendantsTotal={stats.total}
-            onSelect={() => tasks.select(id)}
-            onCommit={(title) => tasks.commitRename(id, title)}
-            onCancel={() => tasks.stopEditing()}
+      {(() => {
+        const framedId =
+          isTouch && state.selectedId && tasks.editingId !== state.selectedId
+            ? state.selectedId
+            : null;
+        const framedPos = framedId ? layout.positions[framedId] : null;
+        const frame = framedId && framedPos && (
+          <div
+            className="task-selection-frame"
+            style={{
+              transform: `translate(${framedPos.x}px, ${framedPos.y - ACTION_BAR_HEIGHT}px)`,
+              width: NODE_WIDTH,
+              height: ACTION_BAR_HEIGHT + NODE_HEIGHT,
+            }}
           />
         );
-      })}
-      {isTouch &&
-        state.selectedId &&
-        tasks.editingId !== state.selectedId &&
-        (() => {
-          const id = state.selectedId;
-          const task = state.tasks[id];
-          const pos = layout.positions[id];
-          if (!task || !pos) return null;
-          return (
-            <TaskActionBar
-              task={task}
-              x={pos.x}
-              y={pos.y}
-              color={nodeColors[id] ?? '#888'}
-              onRename={() => tasks.startEditing(id)}
-              onToggleComplete={() => tasks.toggleComplete(id)}
-              onDelete={() => tasks.backspace(id)}
-              onAddSubtask={() => tasks.newSubtask(id)}
-            />
-          );
-        })()}
+        return (
+          <>
+            {frame}
+            {Object.keys(state.tasks).map((id) => {
+              const task = state.tasks[id];
+              const pos = layout.positions[id];
+              if (!pos) return null;
+              const stats = progress[id] ?? { done: 0, total: 0 };
+              return (
+                <TaskNode
+                  key={id}
+                  task={task}
+                  x={pos.x}
+                  y={pos.y}
+                  color={nodeColors[id]}
+                  selected={state.selectedId === id}
+                  editing={tasks.editingId === id}
+                  isRoot={task.parentId === null}
+                  descendantsDone={stats.done}
+                  descendantsTotal={stats.total}
+                  framed={framedId === id}
+                  onSelect={() => tasks.select(id)}
+                  onCommit={(title) => tasks.commitRename(id, title)}
+                  onCancel={() => tasks.stopEditing()}
+                />
+              );
+            })}
+            {framedId &&
+              framedPos &&
+              (() => {
+                const task = state.tasks[framedId];
+                if (!task) return null;
+                return (
+                  <TaskActionBar
+                    task={task}
+                    x={framedPos.x}
+                    y={framedPos.y}
+                    color={nodeColors[framedId] ?? '#888'}
+                    onRename={() => tasks.startEditing(framedId)}
+                    onToggleComplete={() => tasks.toggleComplete(framedId)}
+                    onDelete={() => tasks.backspace(framedId)}
+                    onRestore={() => tasks.restore(framedId)}
+                    onAddSubtask={() => tasks.newSubtask(framedId)}
+                  />
+                );
+              })()}
+          </>
+        );
+      })()}
     </div>
   );
 }

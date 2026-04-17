@@ -13,6 +13,7 @@ interface Props {
   isRoot: boolean;
   descendantsDone: number;
   descendantsTotal: number;
+  framed?: boolean;
   onSelect: () => void;
   onCommit: (title: string) => void;
   onCancel: () => void;
@@ -28,6 +29,7 @@ export function TaskNode({
   isRoot,
   descendantsDone,
   descendantsTotal,
+  framed,
   onSelect,
   onCommit,
   onCancel,
@@ -67,6 +69,7 @@ export function TaskNode({
     task.completed ? 'task-node--done' : '',
     hasDescendants && !task.completed ? 'task-node--has-progress' : '',
     allDone ? 'task-node--ready' : '',
+    framed ? 'task-node--framed' : '',
   ]
     .filter(Boolean)
     .join(' ');
