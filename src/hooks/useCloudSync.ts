@@ -27,6 +27,7 @@ export interface UseCloudSync {
 }
 
 const PUSH_DEBOUNCE_MS = 1500;
+const FOCUS_RESYNC_MS = 60_000;
 
 function hasContent(state: AppState): boolean {
   return state.rootOrder.length > 0 || Object.keys(state.tasks).length > 0;
@@ -67,7 +68,13 @@ export function useCloudSync(tasks: UseTasks, workspaces: UseWorkspaces): UseClo
   const gistIdRef = useRef<string | null>(null);
   const lastPushedRef = useRef<string>('');
   const initializedRef = useRef(false);
+  const syncInFlightRef = useRef<Promise<void> | null>(null);
+  const unfocusedAtRef = useRef<number | null>(null);
+  const tasksRef = useRef(tasks);
+  const workspacesRef = useRef(workspaces);
   const snapshotRef = useRef(loadWorkspaceSnapshot(workspaces.index, tasks.state));
+  tasksRef.current = tasks;
+  workspacesRef.current = workspaces;
   snapshotRef.current = loadWorkspaceSnapshot(workspaces.index, tasks.state);
   const localUpdatedAtRef = useRef(
     loadSyncUpdatedAt() || inferSnapshotUpdatedAt(snapshotRef.current),
@@ -84,6 +91,67 @@ export function useCloudSync(tasks: UseTasks, workspaces: UseWorkspaces): UseClo
     localUpdatedAtRef.current = updatedAt;
     saveSyncUpdatedAt(updatedAt);
   }, [tasks.state, workspaces.index]);
+
+  const runTimestampSync = useCallback(async () => {
+    const existing = syncInFlightRef.current;
+    if (existing) return existing;
+
+    const sync = (async () => {
+      const token = getToken();
+      if (!token) {
+        setStatus('signed_out');
+        return;
+      }
+
+      const gistId = gistIdRef.current ?? (await findOrCreateGist(token));
+      gistIdRef.current = gistId;
+      console.log('[sync] using gist', gistId);
+
+      const remote = await pullGist(token, gistId);
+      console.log('[sync] pulled gist, length:', remote.length);
+      const localSnapshot = snapshotRef.current;
+      const localUpdatedAt = localUpdatedAtRef.current || inferSnapshotUpdatedAt(localSnapshot);
+
+      const pushLocal = async () => {
+        console.log('[sync] pushing local workspaces to gist');
+        const updatedAt = localUpdatedAt || Date.now();
+        localUpdatedAtRef.current = updatedAt;
+        saveSyncUpdatedAt(updatedAt);
+        const md = encodeWorkspaceMarkdown(localSnapshot, updatedAt);
+        await pushGist(token, gistId, md);
+        lastPushedRef.current = md;
+      };
+
+      if (hasRemoteContent(remote)) {
+        const parsed = decodeWorkspaceMarkdown(remote, workspacesRef.current.activeWorkspace);
+        const remoteUpdatedAt = getMarkdownUpdatedAt(remote) ?? inferSnapshotUpdatedAt(parsed);
+
+        if (remoteUpdatedAt > localUpdatedAt) {
+          console.log('[sync] applying newer remote workspaces');
+          saveWorkspaceSnapshot(parsed);
+          saveSyncUpdatedAt(remoteUpdatedAt);
+          localUpdatedAtRef.current = remoteUpdatedAt;
+          snapshotContentRef.current = snapshotContent(parsed);
+          workspacesRef.current.replaceIndex(parsed.index);
+          tasksRef.current.replaceState(parsed.states[parsed.index.activeId] ?? emptyState());
+          lastPushedRef.current = remote;
+        } else {
+          await pushLocal();
+        }
+      } else if (hasSnapshotContent(localSnapshot)) {
+        await pushLocal();
+      } else {
+        lastPushedRef.current = encodeWorkspaceMarkdown(localSnapshot, localUpdatedAt);
+      }
+    })();
+
+    syncInFlightRef.current = sync;
+    try {
+      await sync;
+    } finally {
+      syncInFlightRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (initializedRef.current) return;
@@ -108,48 +176,7 @@ export function useCloudSync(tasks: UseTasks, workspaces: UseWorkspaces): UseClo
       setStatus('connecting');
       try {
         console.log('[sync] finding or creating gist…');
-        const gistId = await findOrCreateGist(token);
-        gistIdRef.current = gistId;
-        console.log('[sync] using gist', gistId);
-
-        const remote = await pullGist(token, gistId);
-        console.log('[sync] pulled gist, length:', remote.length);
-        const localSnapshot = snapshotRef.current;
-        const localUpdatedAt =
-          localUpdatedAtRef.current || inferSnapshotUpdatedAt(localSnapshot);
-
-        const pushLocal = async () => {
-          console.log('[sync] pushing local workspaces to gist');
-          const updatedAt = localUpdatedAt || Date.now();
-          localUpdatedAtRef.current = updatedAt;
-          saveSyncUpdatedAt(updatedAt);
-          const md = encodeWorkspaceMarkdown(localSnapshot, updatedAt);
-          await pushGist(token, gistId, md);
-          lastPushedRef.current = md;
-        };
-
-        if (hasRemoteContent(remote)) {
-          const parsed = decodeWorkspaceMarkdown(remote, workspaces.activeWorkspace);
-          const remoteUpdatedAt =
-            getMarkdownUpdatedAt(remote) ?? inferSnapshotUpdatedAt(parsed);
-
-          if (remoteUpdatedAt > localUpdatedAt) {
-            console.log('[sync] applying newer remote workspaces');
-            saveWorkspaceSnapshot(parsed);
-            saveSyncUpdatedAt(remoteUpdatedAt);
-            localUpdatedAtRef.current = remoteUpdatedAt;
-            snapshotContentRef.current = snapshotContent(parsed);
-            workspaces.replaceIndex(parsed.index);
-            tasks.replaceState(parsed.states[parsed.index.activeId] ?? emptyState());
-            lastPushedRef.current = remote;
-          } else {
-            await pushLocal();
-          }
-        } else if (hasSnapshotContent(snapshotRef.current)) {
-          await pushLocal();
-        } else {
-          lastPushedRef.current = encodeWorkspaceMarkdown(snapshotRef.current, localUpdatedAt);
-        }
+        await runTimestampSync();
         setStatus('idle');
       } catch (e) {
         console.error('[sync] init failed:', e);
@@ -157,7 +184,42 @@ export function useCloudSync(tasks: UseTasks, workspaces: UseWorkspaces): UseClo
         setStatus('error');
       }
     })();
-  }, [tasks, workspaces]);
+  }, [runTimestampSync]);
+
+  useEffect(() => {
+    const markUnfocused = () => {
+      unfocusedAtRef.current = Date.now();
+    };
+    const maybeSyncOnFocus = () => {
+      const unfocusedAt = unfocusedAtRef.current;
+      if (unfocusedAt === null) return;
+      unfocusedAtRef.current = null;
+      if (Date.now() - unfocusedAt < FOCUS_RESYNC_MS) return;
+      if (!getToken()) return;
+
+      setStatus('syncing');
+      runTimestampSync()
+        .then(() => setStatus('idle'))
+        .catch((e) => {
+          console.error('[sync] focus resume failed:', e);
+          setError((e as Error).message);
+          setStatus('error');
+        });
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') markUnfocused();
+      if (document.visibilityState === 'visible') maybeSyncOnFocus();
+    };
+
+    window.addEventListener('blur', markUnfocused);
+    window.addEventListener('focus', maybeSyncOnFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('blur', markUnfocused);
+      window.removeEventListener('focus', maybeSyncOnFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [runTimestampSync]);
 
   useEffect(() => {
     if (status !== 'idle' && status !== 'syncing') return;
