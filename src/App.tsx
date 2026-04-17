@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTasks } from './hooks/useTasks';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useCloudSync } from './hooks/useCloudSync';
@@ -24,15 +24,30 @@ const STATUS_LABELS: Record<string, string> = {
   error: 'Sync error',
 };
 
+const HELP_HIDDEN_KEY = 'taskdag:hide_shortcuts';
+
 export default function App() {
   const tasks = useTasks();
   const sync = useCloudSync(tasks);
   const layout = useMemo(() => computeLayout(tasks.state), [tasks.state]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [helpHidden, setHelpHidden] = useState<boolean>(
+    () => localStorage.getItem(HELP_HIDDEN_KEY) === '1',
+  );
 
   useKeyboard({ tasks, state: tasks.state, layout });
 
   const empty = tasks.state.rootOrder.length === 0;
+
+  const dismissHelp = () => {
+    localStorage.setItem(HELP_HIDDEN_KEY, '1');
+    setHelpHidden(true);
+  };
+
+  const showHelp = () => {
+    localStorage.removeItem(HELP_HIDDEN_KEY);
+    setHelpHidden(false);
+  };
 
   return (
     <div className="app">
@@ -70,9 +85,25 @@ export default function App() {
           </button>
         )}
       </div>
-      <div className="help-button" tabIndex={0} aria-label="Keyboard shortcuts">
-        ?
-        <div className="help-tooltip" role="tooltip">
+      {helpHidden ? (
+        <button
+          className="help-button"
+          onClick={showHelp}
+          aria-label="Show shortcuts"
+          title="Show shortcuts"
+        >
+          ?
+        </button>
+      ) : (
+        <div className="help-panel" role="complementary" aria-label="Keyboard shortcuts">
+          <button
+            className="help-close"
+            onClick={dismissHelp}
+            aria-label="Hide shortcuts"
+            title="Hide shortcuts"
+          >
+            ×
+          </button>
           <strong>Shortcuts</strong>
           <ul>
             {SHORTCUTS.map(([keys, desc]) => (
@@ -83,7 +114,7 @@ export default function App() {
             ))}
           </ul>
         </div>
-      </div>
+      )}
     </div>
   );
 }
