@@ -72,14 +72,6 @@ export default function App() {
         scrollRef={scrollRef}
         onSelect={(id) => tasks.select(id)}
       />
-      <button
-        className="mobile-root-action"
-        onClick={tasks.newRoot}
-        aria-label="New root task"
-        title="New root task"
-      >
-        + Root
-      </button>
       <div className="storage-indicator">
         {sync.status === 'signed_out' ? (
           <button
@@ -102,6 +94,17 @@ export default function App() {
         )}
       </div>
       <div className="bottom-right-stack">
+        <button
+          className="mobile-root-action"
+          onClick={tasks.newRoot}
+          aria-label="New root task"
+          title="New root task"
+        >
+          <span className="mobile-root-action-icon" aria-hidden>
+            +
+          </span>
+          <span>New root</span>
+        </button>
         <WorkspaceSelector
           index={workspaces.index}
           onSwitch={workspaces.switchTo}

@@ -56,20 +56,17 @@ body {
 }
 
 .mobile-root-action {
-  position: fixed;
-  top: 12px;
-  left: 12px;
-  z-index: 101;
   display: none;
   align-items: center;
   justify-content: center;
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid #d1d5db;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px 0 10px;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.92);
   color: #111827;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   font: inherit;
   font-size: 14px;
@@ -78,6 +75,19 @@ body {
 
 .mobile-root-action:active {
   background: #f3f4f6;
+}
+
+.mobile-root-action-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #4f6df5;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
 }
 
 .storage-dot {
