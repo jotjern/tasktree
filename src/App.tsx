@@ -7,7 +7,6 @@ import { computeLayout } from './model/layout';
 import { Graph } from './components/Graph';
 import { RootRail } from './components/RootRail';
 import { WorkspaceSelector } from './components/WorkspaceSelector';
-import logoUrl from '../logo.png';
 
 const SHORTCUTS: [string, string][] = [
   ['Arrows / WASD', 'Move between tasks'],
@@ -56,8 +55,8 @@ export default function App() {
       <div className="scroll-area" ref={scrollRef}>
         <Graph state={tasks.state} layout={layout} tasks={tasks} scrollRef={scrollRef} />
       </div>
-      <div className="brand-mark" aria-label="TaskDAG">
-        <img src={logoUrl} alt="" />
+      <div className="brand-mark" aria-label="TaskTrees">
+        <img src="/logo.png" alt="" />
       </div>
       <RootRail
         state={tasks.state}
