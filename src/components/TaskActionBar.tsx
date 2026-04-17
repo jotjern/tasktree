@@ -1,10 +1,10 @@
 import { Task } from '../types';
-import { NODE_WIDTH } from '../model/layout';
+import { NODE_HEIGHT, NODE_WIDTH } from '../model/layout';
 import { readableText } from '../model/colors';
 
 export const ACTION_BAR_HEIGHT = 30;
 export const ACTION_PLUS_SIZE = 30;
-export const ACTION_PLUS_GAP = 4;
+export const ACTION_PLUS_GAP = 8;
 
 interface Props {
   task: Task;
@@ -38,7 +38,7 @@ export function TaskActionBar({
     color: textColor,
   };
   const plusStyle: React.CSSProperties = {
-    transform: `translate(${x - ACTION_PLUS_SIZE - ACTION_PLUS_GAP}px, ${y - ACTION_BAR_HEIGHT + (ACTION_BAR_HEIGHT - ACTION_PLUS_SIZE) / 2}px)`,
+    transform: `translate(${x - ACTION_PLUS_SIZE - ACTION_PLUS_GAP}px, ${y - ACTION_BAR_HEIGHT + (ACTION_BAR_HEIGHT + NODE_HEIGHT - ACTION_PLUS_SIZE) / 2}px)`,
     width: ACTION_PLUS_SIZE,
     height: ACTION_PLUS_SIZE,
     background: color,
