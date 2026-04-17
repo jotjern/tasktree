@@ -55,9 +55,6 @@ export default function App() {
       <div className="scroll-area" ref={scrollRef}>
         <Graph state={tasks.state} layout={layout} tasks={tasks} scrollRef={scrollRef} />
       </div>
-      <div className="brand-mark" aria-label="TaskTrees">
-        <img src="/logo.png" alt="" />
-      </div>
       <RootRail
         state={tasks.state}
         layout={layout}
