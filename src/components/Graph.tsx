@@ -4,6 +4,8 @@ import {
   LayoutResult,
   NODE_HEIGHT,
   NODE_WIDTH,
+  PADDING,
+  ROW_HEIGHT,
 } from '../model/layout';
 import { colorForRoot, tintForDepth } from '../model/colors';
 import { depthFromRoot, findRootOf } from '../model/tree';
@@ -21,6 +23,7 @@ interface Props {
 
 export function Graph({ state, layout, tasks, scrollRef }: Props) {
   const isTouch = useIsTouch();
+  const rootButtonSize = NODE_HEIGHT;
   const nodeColors = useMemo(() => {
     const rootIndex: Record<TaskId, number> = {};
     state.rootOrder.forEach((id, i) => {
@@ -92,13 +95,24 @@ export function Graph({ state, layout, tasks, scrollRef }: Props) {
     });
   }
 
+  const leafPositions = Object.keys(state.tasks)
+    .filter((id) => (state.childOrder[id] ?? []).length === 0)
+    .map((id) => layout.positions[id])
+    .filter((pos): pos is NonNullable<typeof pos> => Boolean(pos));
+  const nextRootY =
+    leafPositions.length > 0
+      ? Math.max(...leafPositions.map((pos) => pos.y)) + ROW_HEIGHT
+      : PADDING;
+  const rootButtonX = PADDING + (NODE_WIDTH - rootButtonSize) / 2;
+  const canvasHeight = Math.max(layout.height, nextRootY + NODE_HEIGHT + PADDING);
+
   return (
-    <div className="graph-canvas" style={{ width: layout.width, height: layout.height }}>
+    <div className="graph-canvas" style={{ width: layout.width, height: canvasHeight }}>
       <svg
         className="graph-edges"
         width={layout.width}
-        height={layout.height}
-        viewBox={`0 0 ${layout.width} ${layout.height}`}
+        height={canvasHeight}
+        viewBox={`0 0 ${layout.width} ${canvasHeight}`}
       >
         {edges.map((e) => (
           <path
@@ -173,6 +187,22 @@ export function Graph({ state, layout, tasks, scrollRef }: Props) {
                   />
                 );
               })()}
+            <button
+              className="graph-root-plus"
+              style={{
+                transform: `translate(${rootButtonX}px, ${nextRootY}px)`,
+                width: rootButtonSize,
+                height: rootButtonSize,
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                tasks.newRoot();
+              }}
+              aria-label="New root task"
+              title="New root task"
+            >
+              +
+            </button>
           </>
         );
       })()}

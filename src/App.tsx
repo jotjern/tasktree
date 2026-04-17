@@ -40,8 +40,6 @@ export default function App() {
 
   useKeyboard({ tasks, state: tasks.state, layout });
 
-  const empty = tasks.state.rootOrder.length === 0;
-
   const dismissHelp = () => {
     localStorage.setItem(HELP_HIDDEN_KEY, '1');
     setHelpHidden(true);
@@ -55,16 +53,7 @@ export default function App() {
   return (
     <div className="app">
       <div className="scroll-area" ref={scrollRef}>
-        {empty ? (
-          <div className="empty">
-            <p>No tasks yet.</p>
-            <p>
-              Press <kbd>⌘</kbd>+<kbd>⇧</kbd>+<kbd>⏎</kbd> to create your first root task.
-            </p>
-          </div>
-        ) : (
-          <Graph state={tasks.state} layout={layout} tasks={tasks} scrollRef={scrollRef} />
-        )}
+        <Graph state={tasks.state} layout={layout} tasks={tasks} scrollRef={scrollRef} />
       </div>
       <RootRail
         state={tasks.state}
@@ -94,17 +83,6 @@ export default function App() {
         )}
       </div>
       <div className="bottom-right-stack">
-        <button
-          className="mobile-root-action"
-          onClick={tasks.newRoot}
-          aria-label="New root task"
-          title="New root task"
-        >
-          <span className="mobile-root-action-icon" aria-hidden>
-            +
-          </span>
-          <span>New root</span>
-        </button>
         <WorkspaceSelector
           index={workspaces.index}
           onSwitch={workspaces.switchTo}

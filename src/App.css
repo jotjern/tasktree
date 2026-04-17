@@ -55,41 +55,6 @@ body {
   background: #f9fafb;
 }
 
-.mobile-root-action {
-  display: none;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 12px 0 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #111827;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.mobile-root-action:active {
-  background: #f3f4f6;
-}
-
-.mobile-root-action-icon {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: #4f6df5;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  line-height: 1;
-}
-
 .storage-dot {
   width: 8px;
   height: 8px;
@@ -426,6 +391,36 @@ body {
   pointer-events: none;
 }
 
+.graph-root-plus {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #374151;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 3px 10px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0 0 2px;
+  z-index: 2;
+}
+
+.graph-root-plus:hover {
+  border-color: #9ca3af;
+  color: #111827;
+}
+
+.graph-root-plus:active {
+  background: #f3f4f6;
+}
+
 .task-node {
   position: absolute;
   left: 0;
@@ -684,9 +679,5 @@ body {
 @media (hover: none) and (pointer: coarse) {
   .root-rail {
     display: none;
-  }
-
-  .mobile-root-action {
-    display: inline-flex;
   }
 }
