@@ -69,19 +69,24 @@ export default function App() {
         scrollRef={scrollRef}
         onSelect={(id) => tasks.select(id)}
       />
-      <div className="sync-indicator">
+      <div className="storage-indicator">
         {sync.status === 'signed_out' ? (
-          <button className="sync-button" onClick={sync.signIn}>
-            Sign in with GitHub
+          <button
+            className="storage-button storage-button--local"
+            onClick={sync.signIn}
+            title="Saving to this browser only — click to sync to GitHub"
+          >
+            <span className="storage-dot storage-dot--local" />
+            Local only · Sign in with GitHub
           </button>
         ) : (
           <button
-            className={`sync-button sync-button--${sync.status}`}
+            className={`storage-button storage-button--cloud storage-button--${sync.status}`}
             onClick={sync.signOut}
-            title={sync.error ?? 'Click to sign out'}
+            title={sync.error ?? 'Stored in a private GitHub Gist — click to sign out'}
           >
-            <span className={`sync-dot sync-dot--${sync.status}`} />
-            {STATUS_LABELS[sync.status]}
+            <span className={`storage-dot storage-dot--${sync.status}`} />
+            GitHub Gist · {STATUS_LABELS[sync.status]}
           </button>
         )}
       </div>
