@@ -8,7 +8,9 @@ import {
 import { colorForRoot, tintForDepth } from '../model/colors';
 import { depthFromRoot, findRootOf } from '../model/tree';
 import { TaskNode } from './TaskNode';
+import { TaskActionBar } from './TaskActionBar';
 import { UseTasks } from '../hooks/useTasks';
+import { useIsTouch } from '../hooks/useIsTouch';
 
 interface Props {
   state: AppState;
@@ -18,6 +20,7 @@ interface Props {
 }
 
 export function Graph({ state, layout, tasks, scrollRef }: Props) {
+  const isTouch = useIsTouch();
   const nodeColors = useMemo(() => {
     const rootIndex: Record<TaskId, number> = {};
     state.rootOrder.forEach((id, i) => {
@@ -131,6 +134,27 @@ export function Graph({ state, layout, tasks, scrollRef }: Props) {
           />
         );
       })}
+      {isTouch &&
+        state.selectedId &&
+        tasks.editingId !== state.selectedId &&
+        (() => {
+          const id = state.selectedId;
+          const task = state.tasks[id];
+          const pos = layout.positions[id];
+          if (!task || !pos) return null;
+          return (
+            <TaskActionBar
+              task={task}
+              x={pos.x}
+              y={pos.y}
+              color={nodeColors[id] ?? '#888'}
+              onRename={() => tasks.startEditing(id)}
+              onToggleComplete={() => tasks.toggleComplete(id)}
+              onDelete={() => tasks.backspace(id)}
+              onAddSubtask={() => tasks.newSubtask(id)}
+            />
+          );
+        })()}
     </div>
   );
 }
