@@ -5,6 +5,7 @@ const LEGACY_KEY = 'taskdag:v1';
 const SYNC_UPDATED_AT_KEY = 'taskdag:sync_updated_at';
 
 const workspaceKey = (id: string) => `taskdag:ws:${id}`;
+const cloudBaselineKey = (gistId: string) => `taskdag:cloud_baseline:${gistId}`;
 
 export function loadIndex(): WorkspaceIndex {
   try {
@@ -98,6 +99,17 @@ export function loadSyncUpdatedAt(): number {
 
 export function saveSyncUpdatedAt(updatedAt: number): void {
   localStorage.setItem(SYNC_UPDATED_AT_KEY, String(Math.max(0, Math.floor(updatedAt))));
+}
+
+export function loadCloudBaselineUpdatedAt(gistId: string): number {
+  const raw = localStorage.getItem(cloudBaselineKey(gistId));
+  if (!raw) return 0;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+export function saveCloudBaselineUpdatedAt(gistId: string, updatedAt: number): void {
+  localStorage.setItem(cloudBaselineKey(gistId), String(Math.max(0, Math.floor(updatedAt))));
 }
 
 export function deleteWorkspaceState(id: string): void {

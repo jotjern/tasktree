@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, WorkspaceSnapshot, emptyState } from '../types';
+import { AppState, TaskId, WorkspaceSnapshot, emptyState } from '../types';
 import { UseTasks } from './useTasks';
 import { UseWorkspaces } from './useWorkspaces';
 import { clearToken, getToken, handleCallback, startLogin } from '../cloud/auth';
@@ -10,8 +10,10 @@ import {
   getMarkdownUpdatedAt,
 } from '../cloud/markdown';
 import {
+  loadCloudBaselineUpdatedAt,
   loadSyncUpdatedAt,
   loadWorkspaceSnapshot,
+  saveCloudBaselineUpdatedAt,
   saveSyncUpdatedAt,
   saveWorkspaceSnapshot,
 } from '../storage';
@@ -56,6 +58,74 @@ function inferSnapshotUpdatedAt(snapshot: WorkspaceSnapshot): number {
     }
   }
   return updatedAt;
+}
+
+function mergeSnapshots(remote: WorkspaceSnapshot, local: WorkspaceSnapshot): WorkspaceSnapshot {
+  const states: WorkspaceSnapshot['states'] = { ...remote.states };
+  const workspaces = [...remote.index.workspaces];
+  const remoteIds = new Set(workspaces.map((workspace) => workspace.id));
+
+  for (const localWorkspace of local.index.workspaces) {
+    const remoteState = states[localWorkspace.id];
+    const localState = local.states[localWorkspace.id] ?? emptyState();
+    if (remoteState) {
+      states[localWorkspace.id] = mergeStates(remoteState, localState);
+      continue;
+    }
+
+    const name = remoteIds.has(localWorkspace.id)
+      ? `${localWorkspace.name} (local)`
+      : localWorkspace.name;
+    workspaces.push({ ...localWorkspace, name });
+    states[localWorkspace.id] = localState;
+    remoteIds.add(localWorkspace.id);
+  }
+
+  return {
+    index: {
+      workspaces,
+      activeId: remote.index.activeId,
+      version: 2,
+    },
+    states,
+  };
+}
+
+function mergeStates(remote: AppState, local: AppState): AppState {
+  const tasks = { ...remote.tasks };
+  const childOrder: Record<TaskId, TaskId[]> = {};
+  const rootOrder = [...remote.rootOrder];
+
+  for (const [id, children] of Object.entries(remote.childOrder)) {
+    childOrder[id] = [...children];
+  }
+
+  for (const [id, task] of Object.entries(local.tasks)) {
+    if (tasks[id]) continue;
+    tasks[id] = task;
+    childOrder[id] = [...(local.childOrder[id] ?? [])];
+  }
+
+  for (const [id, children] of Object.entries(local.childOrder)) {
+    if (!tasks[id]) continue;
+    const merged = childOrder[id] ? [...childOrder[id]] : [];
+    for (const childId of children) {
+      if (tasks[childId] && !merged.includes(childId)) merged.push(childId);
+    }
+    childOrder[id] = merged;
+  }
+
+  for (const rootId of local.rootOrder) {
+    if (tasks[rootId] && !rootOrder.includes(rootId)) rootOrder.push(rootId);
+  }
+
+  return {
+    tasks,
+    rootOrder,
+    childOrder,
+    selectedId: remote.selectedId,
+    version: 1,
+  };
 }
 
 export function useCloudSync(tasks: UseTasks, workspaces: UseWorkspaces): UseCloudSync {
@@ -111,30 +181,57 @@ export function useCloudSync(tasks: UseTasks, workspaces: UseWorkspaces): UseClo
       console.log('[sync] pulled gist, length:', remote.length);
       const localSnapshot = snapshotRef.current;
       const localUpdatedAt = localUpdatedAtRef.current || inferSnapshotUpdatedAt(localSnapshot);
+      const baselineUpdatedAt = loadCloudBaselineUpdatedAt(gistId);
+      const localChangedSinceBaseline = localUpdatedAt > baselineUpdatedAt;
 
       const pushLocal = async () => {
         console.log('[sync] pushing local workspaces to gist');
         const updatedAt = localUpdatedAt || Date.now();
         localUpdatedAtRef.current = updatedAt;
         saveSyncUpdatedAt(updatedAt);
+        saveCloudBaselineUpdatedAt(gistId, updatedAt);
         const md = encodeWorkspaceMarkdown(localSnapshot, updatedAt);
         await pushGist(token, gistId, md);
+        lastPushedRef.current = md;
+      };
+
+      const applyRemote = (snapshot: WorkspaceSnapshot, updatedAt: number, markdown: string) => {
+        saveWorkspaceSnapshot(snapshot);
+        saveSyncUpdatedAt(updatedAt);
+        saveCloudBaselineUpdatedAt(gistId, updatedAt);
+        localUpdatedAtRef.current = updatedAt;
+        snapshotContentRef.current = snapshotContent(snapshot);
+        workspacesRef.current.replaceIndex(snapshot.index);
+        tasksRef.current.replaceState(snapshot.states[snapshot.index.activeId] ?? emptyState());
+        lastPushedRef.current = markdown;
+      };
+
+      const pushMerged = async (remoteSnapshot: WorkspaceSnapshot, remoteUpdatedAt: number) => {
+        console.log('[sync] merging local changes with newer cloud save');
+        const merged = mergeSnapshots(remoteSnapshot, localSnapshot);
+        const updatedAt = Math.max(Date.now(), localUpdatedAt, remoteUpdatedAt) + 1;
+        const md = encodeWorkspaceMarkdown(merged, updatedAt);
+        await pushGist(token, gistId, md);
+        saveWorkspaceSnapshot(merged);
+        saveSyncUpdatedAt(updatedAt);
+        saveCloudBaselineUpdatedAt(gistId, updatedAt);
+        localUpdatedAtRef.current = updatedAt;
+        snapshotContentRef.current = snapshotContent(merged);
+        workspacesRef.current.replaceIndex(merged.index);
+        tasksRef.current.replaceState(merged.states[merged.index.activeId] ?? emptyState());
         lastPushedRef.current = md;
       };
 
       if (hasRemoteContent(remote)) {
         const parsed = decodeWorkspaceMarkdown(remote, workspacesRef.current.activeWorkspace);
         const remoteUpdatedAt = getMarkdownUpdatedAt(remote) ?? inferSnapshotUpdatedAt(parsed);
+        const remoteChangedSinceBaseline = remoteUpdatedAt > baselineUpdatedAt;
 
-        if (remoteUpdatedAt > localUpdatedAt) {
+        if (remoteChangedSinceBaseline && localChangedSinceBaseline) {
+          await pushMerged(parsed, remoteUpdatedAt);
+        } else if (remoteUpdatedAt > localUpdatedAt || !localChangedSinceBaseline) {
           console.log('[sync] applying newer remote workspaces');
-          saveWorkspaceSnapshot(parsed);
-          saveSyncUpdatedAt(remoteUpdatedAt);
-          localUpdatedAtRef.current = remoteUpdatedAt;
-          snapshotContentRef.current = snapshotContent(parsed);
-          workspacesRef.current.replaceIndex(parsed.index);
-          tasksRef.current.replaceState(parsed.states[parsed.index.activeId] ?? emptyState());
-          lastPushedRef.current = remote;
+          applyRemote(parsed, remoteUpdatedAt, remote);
         } else {
           await pushLocal();
         }
@@ -239,8 +336,7 @@ export function useCloudSync(tasks: UseTasks, workspaces: UseWorkspaces): UseClo
     const handle = window.setTimeout(async () => {
       setStatus('syncing');
       try {
-        await pushGist(token, gistId, md);
-        lastPushedRef.current = md;
+        await runTimestampSync();
         setStatus('idle');
       } catch (e) {
         console.error('[sync] push failed:', e);
@@ -250,7 +346,7 @@ export function useCloudSync(tasks: UseTasks, workspaces: UseWorkspaces): UseClo
     }, PUSH_DEBOUNCE_MS);
 
     return () => window.clearTimeout(handle);
-  }, [tasks.state, workspaces.index, status]);
+  }, [tasks.state, workspaces.index, status, runTimestampSync]);
 
   const signIn = useCallback(() => {
     setError(null);
