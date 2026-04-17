@@ -1,7 +1,31 @@
-import { AppState, Task, TaskId, emptyState } from '../types';
+import {
+  AppState,
+  Task,
+  TaskId,
+  WorkspaceIndex,
+  WorkspaceMeta,
+  WorkspaceSnapshot,
+  emptyState,
+} from '../types';
 
 export function encodeMarkdown(state: AppState): string {
   const lines: string[] = ['# TaskDAG', ''];
+  lines.push(...encodeTaskLines(state));
+  return lines.join('\n') + '\n';
+}
+
+export function encodeWorkspaceMarkdown(snapshot: WorkspaceSnapshot): string {
+  const lines: string[] = ['# TaskDAG', ''];
+  for (const workspace of snapshot.index.workspaces) {
+    lines.push(`## ${workspace.name} <!-- workspace:${workspace.id} -->`, '');
+    lines.push(...encodeTaskLines(snapshot.states[workspace.id] ?? emptyState()));
+    lines.push('');
+  }
+  return lines.join('\n').replace(/\n+$/, '\n');
+}
+
+function encodeTaskLines(state: AppState): string[] {
+  const lines: string[] = [];
   const walk = (id: TaskId, depth: number) => {
     const task = state.tasks[id];
     if (!task) return;
@@ -13,7 +37,7 @@ export function encodeMarkdown(state: AppState): string {
     for (const childId of children) walk(childId, depth + 1);
   };
   for (const rootId of state.rootOrder) walk(rootId, 0);
-  return lines.join('\n') + '\n';
+  return lines;
 }
 
 interface ParsedLine {
@@ -25,11 +49,55 @@ interface ParsedLine {
 }
 
 const LINE_RE = /^(\s*)-\s*\[([ xX])\]\s*(.*?)(?:\s*<!--\s*id:([^\s]+)(?:\s+ts:(\d+))?\s*-->)?\s*$/;
+const WORKSPACE_HEADING_RE = /^##\s*(.*?)(?:\s*<!--\s*workspace:([^\s]+)\s*-->)?\s*$/;
 
 export function decodeMarkdown(text: string): AppState {
+  return decodeTaskLines(text.split(/\r?\n/));
+}
+
+export function decodeWorkspaceMarkdown(
+  text: string,
+  fallbackWorkspace: WorkspaceMeta,
+): WorkspaceSnapshot {
+  const sections = splitWorkspaceSections(text);
+  if (sections.length === 0) {
+    return {
+      index: {
+        workspaces: [fallbackWorkspace],
+        activeId: fallbackWorkspace.id,
+        version: 2,
+      },
+      states: {
+        [fallbackWorkspace.id]: decodeMarkdown(text),
+      },
+    };
+  }
+
+  const usedIds = new Set<string>();
+  const workspaces: WorkspaceMeta[] = [];
+  const states: Record<string, AppState> = {};
+  for (const section of sections) {
+    const id = uniqueId(section.id ?? newId(), usedIds);
+    usedIds.add(id);
+    const name = section.name.trim() || 'Untitled';
+    workspaces.push({ id, name });
+    states[id] = decodeTaskLines(section.lines);
+  }
+
+  const index: WorkspaceIndex = {
+    workspaces,
+    activeId: workspaces.some((w) => w.id === fallbackWorkspace.id)
+      ? fallbackWorkspace.id
+      : workspaces[0].id,
+    version: 2,
+  };
+  return { index, states };
+}
+
+function decodeTaskLines(lines: string[]): AppState {
   const state = emptyState();
   const parsed: ParsedLine[] = [];
-  for (const raw of text.split(/\r?\n/)) {
+  for (const raw of lines) {
     const m = LINE_RE.exec(raw);
     if (!m) continue;
     const indent = m[1] ?? '';
@@ -38,7 +106,7 @@ export function decodeMarkdown(text: string): AppState {
     let title = (m[3] ?? '').trim();
     const softDeleted = /^~~.*~~$/.test(title);
     if (softDeleted) title = title.replace(/^~~/, '').replace(/~~$/, '');
-    const id = m[4] ?? crypto.randomUUID();
+    const id = m[4] ?? newId();
     const createdAt = m[5] ? Number(m[5]) : Date.now();
     parsed.push({ depth, completed, title, id, createdAt });
 
@@ -68,4 +136,38 @@ export function decodeMarkdown(text: string): AppState {
   }
 
   return state;
+}
+
+function splitWorkspaceSections(text: string): { name: string; id: string | null; lines: string[] }[] {
+  const sections: { name: string; id: string | null; lines: string[] }[] = [];
+  let current: { name: string; id: string | null; lines: string[] } | null = null;
+
+  for (const raw of text.split(/\r?\n/)) {
+    const heading = WORKSPACE_HEADING_RE.exec(raw);
+    if (heading) {
+      current = {
+        name: (heading[1] ?? '').trim(),
+        id: heading[2] ?? null,
+        lines: [],
+      };
+      sections.push(current);
+    } else if (current) {
+      current.lines.push(raw);
+    }
+  }
+
+  return sections;
+}
+
+function uniqueId(id: string, used: Set<string>): string {
+  if (!used.has(id)) return id;
+  let next = newId();
+  while (used.has(next)) next = newId();
+  return next;
+}
+
+function newId(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36);
 }

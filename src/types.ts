@@ -35,3 +35,8 @@ export interface WorkspaceIndex {
   activeId: string;
   version: 2;
 }
+
+export interface WorkspaceSnapshot {
+  index: WorkspaceIndex;
+  states: Record<string, AppState>;
+}

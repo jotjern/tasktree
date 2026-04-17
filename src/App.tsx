@@ -31,7 +31,7 @@ const HELP_HIDDEN_KEY = 'taskdag:hide_shortcuts';
 export default function App() {
   const workspaces = useWorkspaces();
   const tasks = useTasks(workspaces.activeWorkspace.id);
-  const sync = useCloudSync(tasks);
+  const sync = useCloudSync(tasks, workspaces);
   const layout = useMemo(() => computeLayout(tasks.state), [tasks.state]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [helpHidden, setHelpHidden] = useState<boolean>(

@@ -1,4 +1,4 @@
-import { AppState, WorkspaceIndex, emptyState } from './types';
+import { AppState, WorkspaceIndex, WorkspaceSnapshot, emptyState } from './types';
 
 const INDEX_KEY = 'taskdag:workspaces';
 const LEGACY_KEY = 'taskdag:v1';
@@ -67,6 +67,25 @@ export function loadWorkspaceState(id: string): AppState {
 
 export function saveWorkspaceState(id: string, state: AppState): void {
   localStorage.setItem(workspaceKey(id), JSON.stringify(state));
+}
+
+export function loadWorkspaceSnapshot(
+  index: WorkspaceIndex,
+  activeState?: AppState,
+): WorkspaceSnapshot {
+  const states: Record<string, AppState> = {};
+  for (const workspace of index.workspaces) {
+    states[workspace.id] =
+      workspace.id === index.activeId && activeState ? activeState : loadWorkspaceState(workspace.id);
+  }
+  return { index, states };
+}
+
+export function saveWorkspaceSnapshot(snapshot: WorkspaceSnapshot): void {
+  saveIndex(snapshot.index);
+  for (const workspace of snapshot.index.workspaces) {
+    saveWorkspaceState(workspace.id, snapshot.states[workspace.id] ?? emptyState());
+  }
 }
 
 export function deleteWorkspaceState(id: string): void {

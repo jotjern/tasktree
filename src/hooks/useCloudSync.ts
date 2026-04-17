@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from '../types';
+import { AppState, WorkspaceSnapshot, emptyState } from '../types';
 import { UseTasks } from './useTasks';
+import { UseWorkspaces } from './useWorkspaces';
 import { clearToken, getToken, handleCallback, startLogin } from '../cloud/auth';
 import { clearGistId, findOrCreateGist, pullGist, pushGist } from '../cloud/gist';
-import { decodeMarkdown, encodeMarkdown } from '../cloud/markdown';
+import { decodeWorkspaceMarkdown, encodeWorkspaceMarkdown } from '../cloud/markdown';
+import { loadWorkspaceSnapshot, saveWorkspaceSnapshot } from '../storage';
 
 export type SyncStatus = 'signed_out' | 'connecting' | 'idle' | 'syncing' | 'error';
 
@@ -21,7 +23,18 @@ function hasContent(state: AppState): boolean {
   return state.rootOrder.length > 0 || Object.keys(state.tasks).length > 0;
 }
 
-export function useCloudSync(tasks: UseTasks): UseCloudSync {
+function hasSnapshotContent(snapshot: WorkspaceSnapshot): boolean {
+  return (
+    snapshot.index.workspaces.length > 1 ||
+    Object.values(snapshot.states).some((state) => hasContent(state))
+  );
+}
+
+function hasRemoteContent(markdown: string): boolean {
+  return /^##\s+/m.test(markdown) || /^\s*-\s*\[[ xX]\]/m.test(markdown);
+}
+
+export function useCloudSync(tasks: UseTasks, workspaces: UseWorkspaces): UseCloudSync {
   const [status, setStatus] = useState<SyncStatus>(() => {
     if (getToken()) return 'connecting';
     if (new URLSearchParams(window.location.search).get('code')) return 'connecting';
@@ -31,8 +44,8 @@ export function useCloudSync(tasks: UseTasks): UseCloudSync {
   const gistIdRef = useRef<string | null>(null);
   const lastPushedRef = useRef<string>('');
   const initializedRef = useRef(false);
-  const stateRef = useRef(tasks.state);
-  stateRef.current = tasks.state;
+  const snapshotRef = useRef(loadWorkspaceSnapshot(workspaces.index, tasks.state));
+  snapshotRef.current = loadWorkspaceSnapshot(workspaces.index, tasks.state);
 
   useEffect(() => {
     if (initializedRef.current) return;
@@ -63,21 +76,21 @@ export function useCloudSync(tasks: UseTasks): UseCloudSync {
 
         const remote = await pullGist(token, gistId);
         console.log('[sync] pulled gist, length:', remote.length);
-        const remoteHasContent = /^\s*-\s*\[[ xX]\]/m.test(remote);
-        const local = stateRef.current;
 
-        if (remoteHasContent) {
-          console.log('[sync] applying remote state');
-          const parsed = decodeMarkdown(remote);
-          tasks.replaceState(parsed);
+        if (hasRemoteContent(remote)) {
+          console.log('[sync] applying remote workspaces');
+          const parsed = decodeWorkspaceMarkdown(remote, workspaces.activeWorkspace);
+          saveWorkspaceSnapshot(parsed);
+          workspaces.replaceIndex(parsed.index);
+          tasks.replaceState(parsed.states[parsed.index.activeId] ?? emptyState());
           lastPushedRef.current = remote;
-        } else if (hasContent(local)) {
-          console.log('[sync] pushing local state to empty gist');
-          const md = encodeMarkdown(local);
+        } else if (hasSnapshotContent(snapshotRef.current)) {
+          console.log('[sync] pushing local workspaces to empty gist');
+          const md = encodeWorkspaceMarkdown(snapshotRef.current);
           await pushGist(token, gistId, md);
           lastPushedRef.current = md;
         } else {
-          lastPushedRef.current = remote;
+          lastPushedRef.current = encodeWorkspaceMarkdown(snapshotRef.current);
         }
         setStatus('idle');
       } catch (e) {
@@ -86,7 +99,7 @@ export function useCloudSync(tasks: UseTasks): UseCloudSync {
         setStatus('error');
       }
     })();
-  }, [tasks]);
+  }, [tasks, workspaces]);
 
   useEffect(() => {
     if (status !== 'idle' && status !== 'syncing') return;
@@ -94,7 +107,7 @@ export function useCloudSync(tasks: UseTasks): UseCloudSync {
     const gistId = gistIdRef.current;
     if (!token || !gistId) return;
 
-    const md = encodeMarkdown(tasks.state);
+    const md = encodeWorkspaceMarkdown(loadWorkspaceSnapshot(workspaces.index, tasks.state));
     if (md === lastPushedRef.current) return;
 
     const handle = window.setTimeout(async () => {
@@ -111,7 +124,7 @@ export function useCloudSync(tasks: UseTasks): UseCloudSync {
     }, PUSH_DEBOUNCE_MS);
 
     return () => window.clearTimeout(handle);
-  }, [tasks.state, status]);
+  }, [tasks.state, workspaces.index, status]);
 
   const signIn = useCallback(() => {
     setError(null);
