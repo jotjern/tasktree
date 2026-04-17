@@ -12,7 +12,7 @@ export default {
 
     const cors = {
       'Access-Control-Allow-Origin': corsOrigin,
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
       'Access-Control-Max-Age': '86400',
       Vary: 'Origin',
@@ -21,6 +21,19 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
 
     const url = new URL(req.url);
+
+    if (req.method === 'GET' && url.pathname === '/health') {
+      return json(
+        {
+          ok: true,
+          secrets: Boolean(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET),
+          allowedOrigins: allowed,
+        },
+        200,
+        cors,
+      );
+    }
+
     if (req.method !== 'POST' || url.pathname !== '/exchange') {
       return new Response('Not found', { status: 404, headers: cors });
     }
