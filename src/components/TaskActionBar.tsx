@@ -57,7 +57,19 @@ export function TaskActionBar({
         aria-label="Add subtask"
         title="Add subtask"
       >
-        +
+        <svg
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          aria-hidden="true"
+        >
+          <path d="M12 5v14" />
+          <path d="M5 12h14" />
+        </svg>
       </button>
       <div className="task-action-bar" style={barStyle}>
         <button

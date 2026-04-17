@@ -687,21 +687,9 @@ body {
   z-index: 2;
 }
 
-.task-action-plus::before,
-.task-action-plus::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 14px;
-  height: 2px;
-  border-radius: 1px;
-  background: currentColor;
-  transform: translate(-50%, -50%);
-}
-
-.task-action-plus::after {
-  transform: translate(-50%, -50%) rotate(90deg);
+.task-action-plus svg {
+  display: block;
+  flex: none;
 }
 
 .task-action-plus:active {
