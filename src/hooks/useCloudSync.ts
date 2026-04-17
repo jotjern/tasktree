@@ -22,9 +22,11 @@ function hasContent(state: AppState): boolean {
 }
 
 export function useCloudSync(tasks: UseTasks): UseCloudSync {
-  const [status, setStatus] = useState<SyncStatus>(
-    getToken() ? 'connecting' : 'signed_out',
-  );
+  const [status, setStatus] = useState<SyncStatus>(() => {
+    if (getToken()) return 'connecting';
+    if (new URLSearchParams(window.location.search).get('code')) return 'connecting';
+    return 'signed_out';
+  });
   const [error, setError] = useState<string | null>(null);
   const gistIdRef = useRef<string | null>(null);
   const lastPushedRef = useRef<string>('');
