@@ -2,9 +2,11 @@ import { useMemo, useRef, useState } from 'react';
 import { useTasks } from './hooks/useTasks';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useCloudSync } from './hooks/useCloudSync';
+import { useWorkspaces } from './hooks/useWorkspaces';
 import { computeLayout } from './model/layout';
 import { Graph } from './components/Graph';
 import { RootRail } from './components/RootRail';
+import { WorkspaceSelector } from './components/WorkspaceSelector';
 
 const SHORTCUTS: [string, string][] = [
   ['Arrows / WASD', 'Move between tasks'],
@@ -27,7 +29,8 @@ const STATUS_LABELS: Record<string, string> = {
 const HELP_HIDDEN_KEY = 'taskdag:hide_shortcuts';
 
 export default function App() {
-  const tasks = useTasks();
+  const workspaces = useWorkspaces();
+  const tasks = useTasks(workspaces.activeWorkspace.id);
   const sync = useCloudSync(tasks);
   const layout = useMemo(() => computeLayout(tasks.state), [tasks.state]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -90,36 +93,45 @@ export default function App() {
           </button>
         )}
       </div>
-      {helpHidden ? (
-        <button
-          className="help-button"
-          onClick={showHelp}
-          aria-label="Show shortcuts"
-          title="Show shortcuts"
-        >
-          ?
-        </button>
-      ) : (
-        <div className="help-panel" role="complementary" aria-label="Keyboard shortcuts">
+      <div className="bottom-right-stack">
+        <WorkspaceSelector
+          index={workspaces.index}
+          onSwitch={workspaces.switchTo}
+          onCreate={workspaces.create}
+          onRename={workspaces.rename}
+          onRemove={workspaces.remove}
+        />
+        {helpHidden ? (
           <button
-            className="help-close"
-            onClick={dismissHelp}
-            aria-label="Hide shortcuts"
-            title="Hide shortcuts"
+            className="help-button"
+            onClick={showHelp}
+            aria-label="Show shortcuts"
+            title="Show shortcuts"
           >
-            ×
+            ?
           </button>
-          <strong>Shortcuts</strong>
-          <ul>
-            {SHORTCUTS.map(([keys, desc]) => (
-              <li key={keys}>
-                <span className="help-keys">{keys}</span>
-                <span className="help-desc">{desc}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+        ) : (
+          <div className="help-panel" role="complementary" aria-label="Keyboard shortcuts">
+            <button
+              className="help-close"
+              onClick={dismissHelp}
+              aria-label="Hide shortcuts"
+              title="Hide shortcuts"
+            >
+              ×
+            </button>
+            <strong>Shortcuts</strong>
+            <ul>
+              {SHORTCUTS.map(([keys, desc]) => (
+                <li key={keys}>
+                  <span className="help-keys">{keys}</span>
+                  <span className="help-desc">{desc}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

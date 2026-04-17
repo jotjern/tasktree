@@ -24,3 +24,14 @@ export const emptyState = (): AppState => ({
   selectedId: null,
   version: 1,
 });
+
+export interface WorkspaceMeta {
+  id: string;
+  name: string;
+}
+
+export interface WorkspaceIndex {
+  workspaces: WorkspaceMeta[];
+  activeId: string;
+  version: 2;
+}

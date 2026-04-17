@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { AppState, TaskId } from '../types';
-import { loadState, saveState } from '../storage';
+import { loadWorkspaceState, saveWorkspaceState } from '../storage';
 import * as tree from '../model/tree';
 
 export interface UseTasks {
@@ -19,18 +19,32 @@ export interface UseTasks {
   replaceState: (next: AppState) => void;
 }
 
-export function useTasks(): UseTasks {
-  const [state, setState] = useState<AppState>(() => loadState());
+export function useTasks(workspaceId: string): UseTasks {
+  const [state, setState] = useState<AppState>(() => loadWorkspaceState(workspaceId));
   const [editingId, setEditingId] = useState<TaskId | null>(null);
   const timer = useRef<number | null>(null);
+  const currentWorkspaceRef = useRef(workspaceId);
 
   useEffect(() => {
+    if (currentWorkspaceRef.current === workspaceId) return;
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+    currentWorkspaceRef.current = workspaceId;
+    setState(loadWorkspaceState(workspaceId));
+    setEditingId(null);
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (currentWorkspaceRef.current !== workspaceId) return;
     if (timer.current !== null) window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => saveState(state), 150);
+    const id = workspaceId;
+    timer.current = window.setTimeout(() => saveWorkspaceState(id, state), 150);
     return () => {
       if (timer.current !== null) window.clearTimeout(timer.current);
     };
-  }, [state]);
+  }, [state, workspaceId]);
 
   const prevCompletedRoots = useRef<Set<TaskId> | null>(null);
   useEffect(() => {

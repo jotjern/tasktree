@@ -91,10 +91,157 @@ body {
   }
 }
 
-.help-button {
+.bottom-right-stack {
   position: fixed;
   bottom: 12px;
   right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  z-index: 101;
+}
+
+.workspace-selector {
+  position: relative;
+}
+
+.workspace-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 180px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid #e5e7eb;
+  color: #6b7280;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.workspace-trigger:hover {
+  background: #ffffff;
+  color: #1f2937;
+  border-color: #d1d5db;
+}
+
+.workspace-trigger-icon {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.workspace-trigger-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+}
+
+.workspace-menu-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.workspace-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 4px;
+}
+
+.workspace-item:hover {
+  background: #f3f4f6;
+}
+
+.workspace-item--active .workspace-item-name {
+  color: #111827;
+  font-weight: 600;
+}
+
+.workspace-item-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: #374151;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-item-delete {
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  margin-right: 4px;
+  padding: 0;
+}
+
+.workspace-item-delete:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.workspace-rename-input {
+  flex: 1;
+  margin: 4px;
+  padding: 4px 6px;
+  font: inherit;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  outline: none;
+}
+
+.workspace-add {
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: #4f6df5;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 4px;
+  text-align: left;
+  border-top: 1px solid #f3f4f6;
+}
+
+.workspace-add:hover {
+  background: #eef2ff;
+}
+
+.help-button {
   width: 30px;
   height: 30px;
   border-radius: 50%;
@@ -108,7 +255,6 @@ body {
   justify-content: center;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-  z-index: 101;
   padding: 0;
 }
 
@@ -117,9 +263,7 @@ body {
 }
 
 .help-panel {
-  position: fixed;
-  bottom: 12px;
-  right: 12px;
+  position: relative;
   background: #ffffff;
   border: 1px solid #d1d5db;
   border-radius: 8px;
@@ -130,7 +274,6 @@ body {
   color: #1f2937;
   font-weight: 500;
   min-width: 280px;
-  z-index: 101;
 }
 
 .help-panel strong {
