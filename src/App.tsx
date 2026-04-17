@@ -72,6 +72,14 @@ export default function App() {
         scrollRef={scrollRef}
         onSelect={(id) => tasks.select(id)}
       />
+      <button
+        className="mobile-root-action"
+        onClick={tasks.newRoot}
+        aria-label="New root task"
+        title="New root task"
+      >
+        + Root
+      </button>
       <div className="storage-indicator">
         {sync.status === 'signed_out' ? (
           <button
